@@ -5,7 +5,8 @@ class AuthSystem {
     constructor() {
         this.currentUser = null;
         this.sessionKey = 'financeAppSession';
-        this.init();
+        this.isReady = false;
+        this.readyPromise = this.init();
     }
 
     async init() {
@@ -17,6 +18,16 @@ class AuthSystem {
 
         // Create default Master Admin if no users exist
         await this.createDefaultMasterAdmin();
+        
+        this.isReady = true;
+        return true;
+    }
+
+    // Wait for initialization to complete
+    async waitForReady() {
+        if (this.isReady) return true;
+        await this.readyPromise;
+        return true;
     }
 
     // Create default Master Admin user
@@ -50,11 +61,14 @@ class AuthSystem {
     // Login function
     async login(username, password) {
         try {
+            // Wait for initialization to complete
+            await this.waitForReady();
+            
             const users = await financeDB.getAll('users');
             const hashedPassword = this.hashPassword(password);
             
-            const user = users.find(u => 
-                u.username === username && 
+            const user = users.find(u =>
+                u.username === username &&
                 u.password === hashedPassword &&
                 u.active === true
             );
@@ -312,7 +326,6 @@ class AuthSystem {
         }
 
         const role = this.currentUser.role;
-        
         switch(role) {
             case 'masterAdmin':
                 window.location.href = 'master-admin.html';
@@ -359,7 +372,7 @@ class AuthSystem {
             if (this.canViewAllData()) {
                 return users;
             }
-            
+
             // Financer can only see their own employees
             return users.filter(u => 
                 u.financerId === this.currentUser.id || 
