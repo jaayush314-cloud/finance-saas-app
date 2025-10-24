@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Financer Dashboard - Vehicle Finance Management</title>
+    <link rel="stylesheet" href="css/common.css">
+    <style>
+        body { background: #f5f7fa; margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; }
+        .navbar { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .navbar h1 { font-size: 22px; margin: 0; }
+        .user-info { display: flex; align-items: center; gap: 15px; font-size: 14px; }
+        .logout-btn { background: rgba(255,255,255,0.2); border: 1px solid white; color: white; padding: 8px 16px; border-radius: 6px; cursor: pointer; transition: all 0.3s; }
+        .logout-btn:hover { background: white; color: #667eea; }
+        .container { max-width: 1400px; margin: 20px auto; padding: 0 20px; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 25px; }
+        .stat-card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); transition: transform 0.2s; }
+        .stat-card:hover { transform: translateY(-3px); }
+        .stat-card h3 { color: #666; font-size: 13px; margin-bottom: 8px; text-transform: uppercase; }
+        .stat-card .value { font-size: 28px; font-weight: bold; color: #333; }
+        .stat-card .icon { font-size: 32px; margin-bottom: 8px; }
+        .section { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding-bottom: 10px; border-bottom: 2px solid #f0f0f0; }
+        .section-header h2 { font-size: 20px; color: #333; margin: 0; }
+        .btn { padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 600; transition: all 0.2s; }
+        .btn-primary { background: #667eea; color: white; }
+        .btn-primary:hover { background: #5568d3; }
+        .alert-panel { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; }
+        .alert-card { padding: 15px; border-radius: 8px; border-left: 4px solid; }
+        .alert-critical { background: #fee; border-color: #f44336; }
+        .alert-warning { background: #fff3cd; border-color: #FF9800; }
+        .alert-info { background: #d1ecf1; border-color: #2196F3; }
+        .table { width: 100%; border-collapse: collapse; }
+        .table th { background: #f8f9fa; padding: 12px; text-align: left; font-weight: 600; color: #555; border-bottom: 2px solid #e0e0e0; }
+        .table td { padding: 12px; border-bottom: 1px solid #f0f0f0; }
+        .table tr:hover { background: #f8f9fa; }
+        .badge { padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 600; }
+        .badge-success { background: #4CAF50; color: white; }
+        .badge-danger { background: #f44336; color: white; }
+        .badge-warning { background: #FF9800; color: white; }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <h1>📊 Financer Dashboard</h1>
+        <div class="user-info">
+            <span id="currentUser">Loading...</span>
+            <button class="logout-btn" onclick="handleLogout()">Logout</button>
+        </div>
+    </nav>
+    <div class="container">
+        <div class="stats-grid" id="statsGrid"></div>
+        <div class="section">
+            <div class="section-header"><h2>⚠️ Critical Alerts</h2></div>
+            <div class="alert-panel" id="alertsPanel"></div>
+        </div>
+        <div class="section">
+            <div class="section-header">
+                <h2>👥 Customers</h2>
+                <button class="btn btn-primary" onclick="alert('Customer management feature')">+ Add Customer</button>
+            </div>
+            <div id="customersTable"></div>
+        </div>
+    </div>
+    <script src="js/database.js"></script>
+    <script src="js/auth.js"></script>
+    <script>
+        if (!authSystem.protectPage(['masterAdmin', 'financer'])) { }
+        let currentUser = null;
+        document.addEventListener('DOMContentLoaded', async () => {
+            await init();
+        });
+        async function init() {
+            currentUser = authSystem.getCurrentUser();
+            document.getElementById('currentUser').textContent = `👤 ${currentUser.username}`;
+            await loadStats();
+            await loadAlerts();
+            await loadCustomers();
+        }
+        async function loadStats() {
+            const customers = await financeDB.getAll('customers');
+            const payments = await financeDB.getAll('payments');
+            const myCustomers = customers.filter(c => !currentUser || currentUser.role === 'masterAdmin' || c.financerId === currentUser.id);
+            const totalFinance = myCustomers.reduce((sum, c) => sum + (parseFloat(c.financeAmount) || 0), 0);
+            const overdue = myCustomers.filter(c => c.dueDate && new Date(c.dueDate) < new Date()).length;
+            document.getElementById('statsGrid').innerHTML = `
+                <div class="stat-card"><div class="icon">👥</div><h3>Total Customers</h3><div class="value">${myCustomers.length}</div></div>
+                <div class="stat-card"><div class="icon">💰</div><h3>Total Finance</h3><div class="value">₹${totalFinance.toLocaleString()}</div></div>
+                <div class="stat-card"><div class="icon">⚠️</div><h3>Overdue</h3><div class="value">${overdue}</div></div>
+                <div class="stat-card"><div class="icon">📈</div><h3>Payments</h3><div class="value">${payments.length}</div></div>
+            `;
+        }
+        async function loadAlerts() {
+            const customers = await financeDB.getAll('customers');
+            const myCustomers = customers.filter(c => !currentUser || currentUser.role === 'masterAdmin' || c.financerId === currentUser.id);
+            const critical = myCustomers.filter(c => c.dueDate && (new Date() - new Date(c.dueDate)) > 30*24*60*60*1000);
+            const dueToday = myCustomers.filter(c => c.dueDate && new Date(c.dueDate).toDateString() === new Date().toDateString());
+            document.getElementById('alertsPanel').innerHTML = `
+                <div class="alert-card alert-critical"><strong>🔴 Critical:</strong> ${critical.length} customers 30+ days overdue</div>
+                <div class="alert-card alert-warning"><strong>🟡 Due Today:</strong> ${dueToday.length} payments due today</div>
+                <div class="alert-card alert-info"><strong>🟢 This Week:</strong> ${myCustomers.length} total customers</div>
+            `;
+        }
+        async function loadCustomers() {
+            const customers = await financeDB.getAll('customers');
+            const myCustomers = customers.filter(c => !currentUser || currentUser.role === 'masterAdmin' || c.financerId === currentUser.id);
+            if (myCustomers.length === 0) {
+                document.getElementById('customersTable').innerHTML = '<p style="text-align:center;color:#999;padding:40px;">No customers yet. Click "Add Customer" to get started.</p>';
+                return;
+            }
+            let html = '<table class="table"><thead><tr><th>Name</th><th>Vehicle</th><th>Finance Amount</th><th>Due Date</th><th>Status</th></tr></thead><tbody>';
+            myCustomers.forEach(c => {
+                const status = c.dueDate && new Date(c.dueDate) < new Date() ? 'danger' : 'success';
+                html += `<tr><td>${c.name || 'N/A'}</td><td>${c.vehicleNumber || 'N/A'}</td><td>₹${(c.financeAmount || 0).toLocaleString()}</td><td>${c.dueDate || 'N/A'}</td><td><span class="badge badge-${status}">${status === 'danger' ? 'Overdue' : 'Active'}</span></td></tr>`;
+            });
+            html += '</tbody></table>';
+            document.getElementById('customersTable').innerHTML = html;
+        }
+        function handleLogout() {
+            if (confirm('Are you sure you want to logout?')) {
+                authSystem.logout();
+            }
+        }
+    </script>
+</body>
+</html>
