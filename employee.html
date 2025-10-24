@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Employee Dashboard - Finance SaaS</title>
+    <link rel="stylesheet" href="css/common.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="navbar-brand">Finance SaaS - Employee</div>
+        <div class="navbar-user">
+            <span id="employeeName"></span>
+            <button class="btn btn-outline" onclick="handleLogout()">Logout</button>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="stats-grid" style="grid-template-columns: repeat(2, 1fr);">
+            <div class="stat-card">
+                <div class="stat-label">My Tasks Today</div>
+                <div class="stat-value" id="myTasks">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">Completed Today</div>
+                <div class="stat-value" id="completedToday">0</div>
+            </div>
+        </div>
+
+        <div class="card" style="margin-top: 2rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                <h2>Quick Actions</h2>
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem;">
+                <button class="btn btn-primary" onclick="showRecordPayment()" style="padding: 2rem; font-size: 1.1rem;">
+                    💰 Record Payment
+                </button>
+                <button class="btn btn-warning" onclick="showRecordSeizure()" style="padding: 2rem; font-size: 1.1rem;">
+                    🚗 Record Seizure
+                </button>
+            </div>
+        </div>
+
+        <div class="card" style="margin-top: 2rem;">
+            <h2 style="margin-bottom: 1rem;">My Recent Activity</h2>
+            <div id="activityPanel">
+                <p style="text-align: center; color: #666; padding: 2rem;">No recent activity</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/database.js"></script>
+    <script src="js/auth.js"></script>
+    <script>
+        const authSystem = new AuthSystem();
+        const financeDB = new FinanceDB();
+
+        async function init() {
+            await financeDB.init();
+            const currentUser = authSystem.getCurrentUser();
+            
+            if (!currentUser || currentUser.role !== 'employee') {
+                authSystem.logout();
+                return;
+            }
+
+            document.getElementById('employeeName').textContent = currentUser.name;
+            await loadStats();
+            await loadRecentActivity();
+        }
+
+        async function loadStats() {
+            const currentUser = authSystem.getCurrentUser();
+            const logs = await financeDB.getAuditLogs();
+            const myLogs = logs.filter(l => l.userId === currentUser.id);
+            
+            const today = new Date().toISOString().split('T')[0];
+            const todayLogs = myLogs.filter(l => l.timestamp.startsWith(today));
+            
+            document.getElementById('myTasks').textContent = todayLogs.length;
+            document.getElementById('completedToday').textContent = todayLogs.filter(l => l.action.includes('Record')).length;
+        }
+
+        async function loadRecentActivity() {
+            const currentUser = authSystem.getCurrentUser();
+            const logs = await financeDB.getAuditLogs();
+            const myLogs = logs.filter(l => l.userId === currentUser.id).slice(0, 10);
+            
+            if (myLogs.length === 0) return;
+            
+            const html = '<table class="table"><thead><tr><th>Action</th><th>Details</th><th>Time</th></tr></thead><tbody>' +
+                myLogs.map(log => `
+                    <tr>
+                        <td>${log.action}</td>
+                        <td>${log.details || 'N/A'}</td>
+                        <td>${new Date(log.timestamp).toLocaleString()}</td>
+                    </tr>
+                `).join('') + '</tbody></table>';
+            
+            document.getElementById('activityPanel').innerHTML = html;
+        }
+
+        function showRecordPayment() {
+            alert('Payment recording feature will be available in the next update. This feature requires customers.js and payments.js modules.');
+        }
+
+        function showRecordSeizure() {
+            alert('Seizure recording feature will be available in the next update. This feature requires seizures.js module.');
+        }
+
+        function handleLogout() {
+            if (confirm('Are you sure you want to logout?')) {
+                authSystem.logout();
+            }
+        }
+
+        init();
+    </script>
+</body>
+</html>
