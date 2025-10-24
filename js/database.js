@@ -13,7 +13,8 @@ class FinanceDB {
         this.db = null;
         this.encryptionKey = null;
         this.currentUser = null;
-        this.init();
+                this.isReady = false;
+        this.readyPromise = this.init();
     }
 
     // Initialize database and create tables
@@ -78,12 +79,21 @@ class FinanceDB {
                     auditStore.createIndex('timestamp', 'timestamp', { unique: false });
                 }
                 
-                console.log('Database setup complete');
+                console.log('Database setup complete')
+                                this.isReady = true;
+            return true;;
             };
         } catch (error) {
             console.error('Database initialization error:', error);
             this.runSelfHealing();
         }
+    }
+
+        // Wait for database initialization to complete
+    async waitForReady() {
+        if (this.isReady) return true;
+        await this.readyPromise;
+        return true;
     }
 
     // Encrypt data before storage (AES-256 simulation)
@@ -107,7 +117,8 @@ class FinanceDB {
 
     // Add record with encryption
     async add(storeName, data) {
-        return new Promise((resolve, reject) => {
+        return new Promise((resolve, reject) => 
+                        await this.waitForReady();{
             const transaction = this.db.transaction([storeName], 'readwrite');
             const store = transaction.objectStore(storeName);
             
